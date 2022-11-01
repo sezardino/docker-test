@@ -1,0 +1,78 @@
+version: "3"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: real-world-frontend
+    command: serve -s build -l 3000
+    restart: always
+    networks:
+      - real-world-docker-network
+
+  api:
+    build: ./api
+    container_name: real-world-api
+    command: npm start
+    restart: always
+    environment:
+      - PORT=3001
+      - MONGO_URI=mongodb://api_db:27017/api
+      - AUTH_API_URL=http://auth:3002
+    depends_on:
+      - api_db
+    networks:
+      - real-world-docker-network
+
+  auth:
+    build: ./auth
+    command: npm start
+    container_name: real-world-auth
+    restart: always
+    environment:
+      - PORT=3002
+      - MONGO_URI=mongodb://auth_db:27017/auth
+      - API_URL=http://api:3001
+    depends_on:
+      - auth_db
+    networks:
+      - real-world-docker-network
+
+  api_db:
+    image: mongo:latest
+    container_name: real-world-api-db
+    volumes:
+      - db_api:/data/db
+    networks:
+      - real-world-docker-network
+
+  auth_db:
+    image: mongo:latest
+    container_name: real-world-auth-db
+    volumes:
+      - db_auth:/data/db
+    networks:
+      - real-world-docker-network
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: real-world-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf.prod:/etc/nginx/conf.d/nginx.conf
+    depends_on:
+      - frontend
+      - api
+      - auth
+    networks:
+      - real-world-docker-network
+
+volumes:
+  db_api:
+  db_auth:
+
+networks:
+  real-world-docker-network:
+    driver: bridge
